@@ -1,0 +1,29 @@
+name: Load Test (Staging)
+
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install flask locust
+
+      - name: Start app in background
+        run: python app.py &
+
+      - name: Wait for app to be ready
+        run: sleep 3
+
+      - name: Run load test
+        run: make load-test

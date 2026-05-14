@@ -47,6 +47,90 @@ make all          # install, format, lint, test
 python tsp.py Cairo   # fetches real restaurants and finds optimal route
 ```
 
+## Azure Deployment — MLOps Pipeline from Zero
+
+Deploy the ML Flask app to Azure App Service with continuous delivery.
+
+### Prerequisites
+- Azure account with active subscription
+- Azure CLI installed (`brew install azure-cli`)
+
+### Step 1 — Login to Azure
+```bash
+az login --tenant <your-tenant-id>
+# verify subscription
+az account show --query "{name:name, id:id}" -o table
+```
+
+### Step 2 — Check allowed regions for your subscription
+```bash
+az policy assignment list --query "[0].parameters" -o json
+```
+
+### Step 3 — Create a resource group
+```bash
+az group create --name mlops-rg --location uaenorth
+```
+> Use a region allowed by your subscription policy (e.g. `uaenorth`, `francecentral`)
+
+### Step 4 — Deploy the app
+```bash
+cd chapter-02/code/ml-flask
+
+az webapp up \
+  --name flask-mlops-abdulrahman \
+  --resource-group mlops-rg \
+  --runtime "PYTHON:3.11" \
+  --sku FREE \
+  --location uaenorth
+```
+
+Azure will automatically:
+1. Create an App Service Plan (the server)
+2. Create the Web App
+3. Zip and upload your code
+4. Install `requirements.txt`
+5. Start the app
+
+### Step 5 — Test the live app
+```bash
+# Check it's running
+curl http://flask-mlops-abdulrahman.azurewebsites.net/
+
+# Get a prediction
+curl -X POST http://flask-mlops-abdulrahman.azurewebsites.net/predict \
+  -H "Content-Type: application/json" \
+  -d '{"size_sqft": 1500, "bedrooms": 3}'
+```
+
+### Step 6 — Redeploy after changes
+Any time you change the code, just run:
+```bash
+az webapp up
+```
+Azure remembers the defaults from the previous deploy.
+
+### What was deployed
+
+```
+Your Mac  →  az webapp up  →  Azure App Service (UAE North)
+                                      │
+                              mlops-rg (resource group)
+                                      │
+                              abdoelbanna240_asp (App Service Plan)
+                                      │
+                              flask-mlops-abdulrahman (Web App)
+                                      │
+                              http://flask-mlops-abdulrahman.azurewebsites.net
+```
+
+### Live URL
+```
+http://flask-mlops-abdulrahman.azurewebsites.net
+```
+
+---
+
 ## Critical Thinking Discussion Questions
 
 **1. GPU company: buy hardware vs. stay on cloud?**

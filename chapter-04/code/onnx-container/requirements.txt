@@ -1,0 +1,8 @@
+flask
+scikit-learn
+numpy
+onnxruntime
+skl2onnx
+pytest
+black
+pylint

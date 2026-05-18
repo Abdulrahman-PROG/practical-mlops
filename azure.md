@@ -58,4 +58,100 @@ http://flask-mlops-abdulrahman.azurewebsites.net
 
 ---
 
+## Chapter 04 — ONNX Container on Azure Container Registry + Container Instances
+
+### Technologies Used
+
+| Technology | What it is |
+|------------|-----------|
+| **Azure Container Registry (ACR)** | Private Docker image registry on Azure — store and version your container images |
+| **Azure Container Instances (ACI)** | Run containers directly without managing servers or Kubernetes |
+| **Azure Resource Group** | Same as before — groups ACR + ACI together for easy cleanup |
+
+### Architecture
+
+```
+Local code
+    ↓
+az acr build  →  Azure Container Registry (stores image)
+                          ↓
+              az container create  →  Azure Container Instances (runs image)
+                                              ↓
+                                  http://iris-onnx-abdulrahman.uaenorth.azurecontainer.io:5000
+```
+
+### Step-by-Step Commands
+
+```bash
+# 1. Login
+az login --tenant 734604f1-7b61-4862-83af-872c0a345c53
+
+# 2. Create resource group
+az group create --name mlops-rg --location uaenorth
+
+# 3. Create Azure Container Registry
+az acr create \
+  --name mlopsacrabdulrahman \
+  --resource-group mlops-rg \
+  --sku Basic \
+  --admin-enabled true
+
+# 4. Build and push image directly to ACR (no local Docker needed)
+cd chapter-04/code/onnx-container
+az acr build \
+  --registry mlopsacrabdulrahman \
+  --image iris-onnx:latest \
+  .
+
+# 5. Get ACR credentials
+ACR_SERVER=$(az acr show --name mlopsacrabdulrahman --query loginServer -o tsv)
+ACR_USERNAME=$(az acr credential show --name mlopsacrabdulrahman --query username -o tsv)
+ACR_PASSWORD=$(az acr credential show --name mlopsacrabdulrahman --query "passwords[0].value" -o tsv)
+
+# 6. Deploy to Azure Container Instances
+az container create \
+  --resource-group mlops-rg \
+  --name iris-onnx-aci \
+  --image mlopsacrabdulrahman.azurecr.io/iris-onnx:latest \
+  --registry-login-server $ACR_SERVER \
+  --registry-username $ACR_USERNAME \
+  --registry-password $ACR_PASSWORD \
+  --ports 5000 \
+  --dns-name-label iris-onnx-abdulrahman \
+  --cpu 1 \
+  --memory 1.5
+
+# 7. Get the live URL
+az container show \
+  --resource-group mlops-rg \
+  --name iris-onnx-aci \
+  --query ipAddress.fqdn -o tsv
+
+# 8. Test it
+curl http://<fqdn>:5000/health
+curl -X POST http://<fqdn>:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"sepal_length": 5.1, "sepal_width": 3.5, "petal_length": 1.4, "petal_width": 0.2}'
+
+# 9. Delete everything to save credits
+az group delete --name mlops-rg --yes --no-wait
+```
+
+### Or use the deploy script
+```bash
+cd chapter-04/code/onnx-container
+bash deploy_aci.sh    # creates ACR, builds image, deploys to ACI
+bash destroy_aci.sh   # deletes everything
+```
+
+### GitHub Actions — Auto push to ACR on every commit
+Add these secrets to your GitHub repo (Settings → Secrets → Actions):
+- `ACR_LOGIN_SERVER` = `mlopsacrabdulrahman.azurecr.io`
+- `ACR_USERNAME` = output of `az acr credential show --name mlopsacrabdulrahman --query username -o tsv`
+- `ACR_PASSWORD` = output of `az acr credential show --name mlopsacrabdulrahman --query "passwords[0].value" -o tsv`
+
+Workflow file: [azure-acr.yml](chapter-04/code/onnx-container/.github/workflows/azure-acr.yml)
+
+---
+
 <!-- Add future chapters below this line -->
